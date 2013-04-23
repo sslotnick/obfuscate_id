@@ -46,6 +46,19 @@ describe "#obfuscate_id_spin" do
       expect(u.to_param).to_not eql p.to_param
     end
   end
+
+  context "when not overwriting find" do
+    before do
+      class User < ActiveRecord::Base
+        obfuscate_id overwrite_find: false
+      end
+    end
+    let (:user) { User.create(id: 1) }
+
+    it "should load the value by id" do
+      user.should eq User.find(1)
+    end
+  end
 end
 
 describe "#deobfuscate_id" do

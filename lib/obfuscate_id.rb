@@ -5,8 +5,10 @@ module ObfuscateId
 
     extend ClassMethods 
     include InstanceMethods
-    cattr_accessor :obfuscate_id_spin
+    cattr_accessor :obfuscate_id_spin, :overwrite_find
     self.obfuscate_id_spin = (options[:spin] || obfuscate_id_default_spin)
+    options[:overwrite_find] = true if options[:overwrite_find].nil?
+    self.overwrite_find = options[:overwrite_find]
   end
 
   def self.hide(id, spin)
@@ -22,15 +24,24 @@ module ObfuscateId
     def find(*args)
       scope = args.slice!(0)
       options = args.slice!(0) || {}
-      if has_obfuscated_id? && !options[:no_obfuscated_id]
+      if self.overwrite_find && !options[:no_obfuscated_id]
+        find_by_obfuscated_id(scope, options)
+      else
+        options.delete(:no_obfuscated_id)
+        super(scope, options)
+      end
+    end
+
+    def find_by_obfuscated_id(scope, options = {})
+      if has_obfuscated_id?
         if scope.is_a?(Array)
           scope.map! {|a| deobfuscate_id(a).to_i}
         else
           scope = deobfuscate_id(scope)
         end
       end
-      options.delete(:no_obfuscated_id)
-      super(scope, options)
+      options[:no_obfuscated_id] = true
+      find(scope, options)
     end
 
     def has_obfuscated_id?
@@ -62,7 +73,7 @@ module ObfuscateId
     # As ActiveRecord::Persistence#reload uses self.id
     # reload without deobfuscating
     def reload(options = nil)
-      options = (options || {}).merge(:no_obfuscated_id => true)
+      options = (options || {}).merge(no_obfuscated_id: true)
       super(options)
     end
 
