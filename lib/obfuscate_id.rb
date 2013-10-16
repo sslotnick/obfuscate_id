@@ -20,14 +20,25 @@ module ObfuscateId
 
   module ClassMethods
     def find(*args)
-      if has_obfuscated_id?
-        args[0] = ObfuscateId.show(args[0], self.obfuscate_id_spin)
+      scope = args.slice!(0)
+      options = args.slice!(0) || {}
+      if has_obfuscated_id? && !options[:no_obfuscated_id]
+        if scope.is_a?(Array)
+          scope.map! {|a| deobfuscate_id(a).to_i}
+        else
+          scope = deobfuscate_id(scope)
+        end
       end
-      super(*args)
+      options.delete(:no_obfuscated_id)
+      super(scope, options)
     end
 
     def has_obfuscated_id?
       true
+    end
+
+    def deobfuscate_id(obfuscated_id)
+      ObfuscateId.show(obfuscated_id, self.obfuscate_id_spin)
     end
 
     # Generate a default spin from the Model name
@@ -48,14 +59,15 @@ module ObfuscateId
       ObfuscateId.hide(self.id, self.class.obfuscate_id_spin)
     end
 
-    # Temporarily set the id to the parameterized version,
-    # as ActiveRecord::Persistence#reload uses self.id.
-    def reload(options=nil)
-      actual_id = self.id
-      self.id = to_param
-      super(options).tap do
-        self.id = actual_id
-      end
+    # As ActiveRecord::Persistence#reload uses self.id
+    # reload without deobfuscating
+    def reload(options = nil)
+      options = (options || {}).merge(:no_obfuscated_id => true)
+      super(options)
+    end
+
+    def deobfuscate_id(obfuscated_id)
+      self.class.deobfuscate_id(obfuscated_id)
     end
   end
 end
